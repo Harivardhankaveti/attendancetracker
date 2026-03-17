@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "410550769668",
+    "project_id": "attendancetracker-51192",
+    "storage_bucket": "attendancetracker-51192.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:410550769668:android:ab9b38b6a95cfae786fd51",
+        "android_client_info": {
+          "package_name": "com.attendance.flutter_attendance_tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWOBJPgdbmaA1iDEE88Bu_ET2Tr7F-yVA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
