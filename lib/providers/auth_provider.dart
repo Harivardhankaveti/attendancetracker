@@ -103,6 +103,8 @@ class AuthProvider extends ChangeNotifier {
     String? facultyId,
     String? department,
     String? year,
+    String? branch,
+    String? section,
     String? designation,
   }) async {
     _setLoading(true);
@@ -116,6 +118,8 @@ class AuthProvider extends ChangeNotifier {
         facultyId: facultyId,
         department: department,
         year: year,
+        branch: branch,
+        section: section,
         designation: designation,
       );
 

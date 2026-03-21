@@ -19,6 +19,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _rollNumberController = TextEditingController();
   final _departmentController = TextEditingController();
   String _selectedYear = '1st Year';
+  String _selectedBranch = 'CSE';
+  final List<String> _branches = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'CSDS', 'CSM', 'CSBS', 'IT'];
+  String _selectedSection = 'A';
+  final List<String> _sections = ['A', 'B', 'C', 'D', 'E'];
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -51,11 +55,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       String? facultyId;
       String? department;
       String? year;
+      String? branch;
+      String? section;
       String? designation;
 
       if (_selectedRole == 'Student') {
         studentId = _rollNumberController.text.trim();
         year = _selectedYear;
+        branch = _selectedBranch;
+        section = _selectedSection;
       } else if (_selectedRole == 'Faculty') {
         facultyId = 'FAC${DateTime.now().millisecondsSinceEpoch}';
         department = _departmentController.text.trim();
@@ -71,6 +79,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         facultyId: facultyId,
         department: department,
         year: year,
+        branch: branch,
+        section: section,
         designation: designation,
       );
 
@@ -228,7 +238,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 16),
 
                 // Role-specific fields
-                if (_selectedRole == 'Student')
+                if (_selectedRole == 'Student') ...[
                   TextFormField(
                     controller: _rollNumberController,
                     decoration: const InputDecoration(
@@ -241,22 +251,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       }
                       return null;
                     },
-                  )
-                else if (_selectedRole == 'Faculty')
-                  TextFormField(
-                    controller: _departmentController,
-                    decoration: const InputDecoration(
-                      labelText: 'Department',
-                      prefixIcon: Icon(Icons.business_outlined),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your department';
-                      }
-                      return null;
-                    },
-                  )
-                else if (_selectedRole == 'Student')
+                  ),
+                  const SizedBox(height: 16),
                   // Year Selection for Students
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
@@ -286,6 +282,80 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         return null;
                       },
                     ),
+                  ),
+                  // Branch Selection for Students
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedBranch,
+                      decoration: const InputDecoration(
+                        labelText: 'Branch',
+                        prefixIcon: Icon(Icons.school_outlined),
+                      ),
+                      items: _branches.map((String branch) {
+                        return DropdownMenuItem(
+                          value: branch,
+                          child: Text(branch),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _selectedBranch = newValue;
+                          });
+                        }
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select your branch';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  // Section Selection for Students
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedSection,
+                      decoration: const InputDecoration(
+                        labelText: 'Section',
+                        prefixIcon: Icon(Icons.class_outlined),
+                      ),
+                      items: _sections.map((String section) {
+                        return DropdownMenuItem(
+                          value: section,
+                          child: Text(section),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _selectedSection = newValue;
+                          });
+                        }
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select your section';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ] else if (_selectedRole == 'Faculty')
+                  TextFormField(
+                    controller: _departmentController,
+                    decoration: const InputDecoration(
+                      labelText: 'Department',
+                      prefixIcon: Icon(Icons.business_outlined),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your department';
+                      }
+                      return null;
+                    },
                   ),
                 const SizedBox(height: 16),
 

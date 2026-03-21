@@ -49,6 +49,9 @@ class AppRouter {
       // Wait until auth initializes
       if (!isInitialized) return null;
 
+      // Let the splash screen handle its own navigation after animations finish
+      if (state.matchedLocation == '/') return null;
+
       final isAuthRoute = state.matchedLocation.startsWith('/login') ||
           state.matchedLocation.startsWith('/register') ||
           state.matchedLocation.startsWith('/forgot-password');

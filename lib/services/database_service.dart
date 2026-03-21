@@ -65,6 +65,8 @@ class DatabaseService {
   String? facultyId,
   String? department,
   String? year,
+  String? branch,
+  String? section,
   String? designation,
 }) async {
   try {
@@ -78,6 +80,8 @@ class DatabaseService {
       "facultyId": facultyId,
       "department": department,
       "year": year,
+      "branch": branch,
+      "section": section,
       "designation": designation,
 
       "createdAt": FieldValue.serverTimestamp(), // ✅ FIX

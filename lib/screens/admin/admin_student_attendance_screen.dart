@@ -13,8 +13,8 @@ class AdminStudentAttendanceScreen extends StatefulWidget {
 class _AdminStudentAttendanceScreenState extends State<AdminStudentAttendanceScreen> {
   String? _selectedBranch;
   String? _selectedSection;
-  final List<String> _branches = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL'];
-  final List<String> _sections = ['A', 'B', 'C', 'D'];
+  final List<String> _branches = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL','CSDS','CSM','CSBS','IT'];
+  final List<String> _sections = ['A', 'B', 'C', 'D','E','F'];
   List<StudentAttendanceData> _students = [];
   bool _isLoading = false;
 

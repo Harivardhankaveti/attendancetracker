@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
 import '../../providers/auth_provider.dart';
+import 'admin_notifications_view.dart';
+import 'admin_settings_view.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({Key? key}) : super(key: key);
@@ -28,9 +30,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (_selectedIndex == 0) {
       return _buildDashboard();
     } else if (_selectedIndex == 1) {
-      return _buildNotifications();
+      return const AdminNotificationsView();
     } else if (_selectedIndex == 2) {
-      return _buildSettings();
+      return const AdminSettingsView();
     } else {
       return _buildProfile();
     }
@@ -364,17 +366,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildNotifications() {
-    return Center(
-      child: const Text('Notifications - Coming Soon'),
-    );
-  }
 
-  Widget _buildSettings() {
-    return Center(
-      child: const Text('Settings - Coming Soon'),
-    );
-  }
 
   Widget _buildProfile() {
     final authProvider = context.watch<AuthProvider>();
@@ -467,7 +459,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.notifications),
-          label: 'Notifications',
+          label: 'Alerts',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.settings),

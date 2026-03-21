@@ -24,13 +24,13 @@ class _StudentTimetableScreenState extends State<StudentTimetableScreen> {
     'Saturday'
   ];
 
-  // ✅ Get Branch from logged-in user
+  // ✅ FIXED: Use department instead of branch
   String _getBranch() {
     final authProvider = context.read<AuthProvider>();
-    return authProvider.user?.branch ?? "CSE";
+    return (authProvider.user?.department ?? "cse").toUpperCase();
   }
 
-  // ✅ Get Section from logged-in user
+  // ✅ Section remains same
   String _getSection() {
     final authProvider = context.read<AuthProvider>();
     return authProvider.user?.section ?? "A";
@@ -38,6 +38,10 @@ class _StudentTimetableScreenState extends State<StudentTimetableScreen> {
 
   @override
   Widget build(BuildContext context) {
+    String docId = "${_getBranch()}_${_getSection()}";
+
+    print("Fetching timetable for: $docId"); // DEBUG
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -77,26 +81,18 @@ class _StudentTimetableScreenState extends State<StudentTimetableScreen> {
                       });
                     },
                     child: Container(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 8),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 8),
+                      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.background,
+                        color: isSelected ? AppColors.primary : AppColors.background,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Center(
                         child: Text(
                           day,
                           style: TextStyle(
-                            color: isSelected
-                                ? Colors.white
-                                : AppColors.textSecondary,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                            color: isSelected ? Colors.white : AppColors.textSecondary,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             fontSize: 14,
                           ),
                         ),
@@ -120,48 +116,63 @@ class _StudentTimetableScreenState extends State<StudentTimetableScreen> {
               ),
             ),
 
-            // 🔥 REAL-TIME TIMETABLE
+            // 🔥 TIMETABLE
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
+              child: StreamBuilder<DocumentSnapshot>(
                 stream: FirebaseConfig.firestore
-                    .collection('timetable')
-                    .where('branch', isEqualTo: _getBranch())
-                    .where('section', isEqualTo: _getSection())
-                    .where('dayOfWeek', isEqualTo: _selectedDay)
+                    .collection('timetables')
+                    .doc(docId)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return const Center(
-                        child: CircularProgressIndicator());
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
                   }
 
-                  if (!snapshot.hasData ||
-                      snapshot.data!.docs.isEmpty) {
+                  if (!snapshot.hasData || !snapshot.data!.exists) {
                     return const Center(
-                      child: Text("No classes scheduled"),
+                      child: Text("No timetable found"),
                     );
                   }
 
-                  var docs = snapshot.data!.docs;
+                  var data = snapshot.data!.data() as Map<String, dynamic>;
+                  var schedule = data['schedule'] as Map<String, dynamic>? ?? {};
+                  var daySchedule = schedule[_selectedDay] as Map<String, dynamic>? ?? {};
+
+                  if (daySchedule.isEmpty) {
+                    return const Center(
+                      child: Text("No classes scheduled for this day"),
+                    );
+                  }
+
+                  var sortedKeys = daySchedule.keys.toList()
+                    ..sort((a, b) => a.compareTo(b));
 
                   return ListView.builder(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: docs.length,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: sortedKeys.length,
                     itemBuilder: (context, index) {
-                      var data =
-                          docs[index].data() as Map<String, dynamic>;
+                      String timeSlot = sortedKeys[index];
+                      String subject = daySchedule[timeSlot];
+
+                      String startTime = timeSlot;
+                      String endTime = '';
+
+                      if (timeSlot.contains('-')) {
+                        var parts = timeSlot.split('-');
+                        startTime = parts.first.trim();
+                        endTime = parts.last.trim();
+                      }
 
                       return _buildScheduleCard(
                         TimetableEntry(
-                          courseCode: data['courseCode'] ?? '',
-                          courseName: data['courseName'] ?? '',
-                          faculty: data['facultyName'] ?? '',
-                          room: data['room'] ?? '',
-                          startTime: data['startTime'] ?? '',
-                          endTime: data['endTime'] ?? '',
-                          dayOfWeek: data['dayOfWeek'] ?? '',
+                          courseCode: subject,
+                          courseName: '',
+                          faculty: 'Instructor',
+                          room: 'TBD',
+                          startTime: startTime,
+                          endTime: endTime,
+                          dayOfWeek: _selectedDay,
                         ),
                       );
                     },
@@ -195,16 +206,14 @@ class _StudentTimetableScreenState extends State<StudentTimetableScreen> {
         children: [
           // ⏰ Time Box
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
               children: [
-                const Icon(Icons.access_time,
-                    color: AppColors.primary, size: 20),
+                const Icon(Icons.access_time, color: AppColors.primary, size: 20),
                 const SizedBox(height: 4),
                 Text(
                   entry.startTime,
@@ -214,15 +223,17 @@ class _StudentTimetableScreenState extends State<StudentTimetableScreen> {
                     fontSize: 12,
                   ),
                 ),
-                const Text('-', style: TextStyle(fontSize: 10)),
-                Text(
-                  entry.endTime,
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                if (entry.endTime.isNotEmpty) ...[
+                  const Text('-', style: TextStyle(fontSize: 10)),
+                  Text(
+                    entry.endTime,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -235,7 +246,7 @@ class _StudentTimetableScreenState extends State<StudentTimetableScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${entry.courseCode} (${entry.courseName})',
+                  entry.courseCode,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -245,34 +256,20 @@ class _StudentTimetableScreenState extends State<StudentTimetableScreen> {
                 const SizedBox(height: 8),
 
                 Row(
-                  children: [
-                    const Icon(Icons.person,
-                        size: 16, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                    Text(
-                      entry.faculty,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
+                  children: const [
+                    Icon(Icons.person, size: 16, color: AppColors.textSecondary),
+                    SizedBox(width: 4),
+                    Text("Instructor", style: TextStyle(color: AppColors.textSecondary)),
                   ],
                 ),
 
                 const SizedBox(height: 4),
 
                 Row(
-                  children: [
-                    const Icon(Icons.location_on,
-                        size: 16, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                    Text(
-                      entry.room,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
+                  children: const [
+                    Icon(Icons.location_on, size: 16, color: AppColors.textSecondary),
+                    SizedBox(width: 4),
+                    Text("Room TBD", style: TextStyle(color: AppColors.textSecondary)),
                   ],
                 ),
               ],
@@ -284,7 +281,7 @@ class _StudentTimetableScreenState extends State<StudentTimetableScreen> {
   }
 }
 
-// 📦 Model Class
+// 📦 Model
 class TimetableEntry {
   final String courseCode;
   final String courseName;

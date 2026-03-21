@@ -164,6 +164,7 @@ class _LoginScreenState extends State<LoginScreen>
     String? Function(String?)? validator,
     bool obscureText = false,
     VoidCallback? onTap,
+    Widget? suffixIcon,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -188,6 +189,7 @@ class _LoginScreenState extends State<LoginScreen>
           hintText: hint,
           hintStyle: TextStyle(color: placeholderColor),
           prefixIcon: Icon(icon, color: primaryOrange),
+          suffixIcon: suffixIcon,
           filled: true,
           fillColor: cardBackground,
           contentPadding:
@@ -343,6 +345,19 @@ class _LoginScreenState extends State<LoginScreen>
                             hint: 'Password',
                             icon: Icons.lock_outline,
                             obscureText: _obscurePassword,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: placeholderColor,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter your password';

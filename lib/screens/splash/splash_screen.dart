@@ -139,6 +139,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.orange,
       body: FadeTransition(
         opacity: _fadeOpacity,
         child: Container(
@@ -182,6 +183,7 @@ class _SplashScreenState extends State<SplashScreen>
                             padding: const EdgeInsets.all(20),
                             child: Image.asset(
                               'assets/griet_logo.png',
+                              
                               fit: BoxFit.contain,
                               errorBuilder: (context, error, stackTrace) {
                                 // Fallback UI if image fails to load

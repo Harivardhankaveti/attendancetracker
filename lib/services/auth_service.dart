@@ -102,6 +102,8 @@ class AuthService {
     String? facultyId,
     String? department,
     String? year,
+    String? branch,
+    String? section,
     String? designation,
   }) async {
     try {
@@ -125,6 +127,8 @@ class AuthService {
         facultyId: facultyId,
         department: department,
         year: year,
+        branch: branch,
+        section: section,
         designation: designation,
       );
 
