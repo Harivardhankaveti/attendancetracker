@@ -47,3 +47,4 @@ app.*.map.json
 =======
 node_modules
 >>>>>>> 86a7ea8f83dd0396324810bf3ab721bc35f81541
+.env
