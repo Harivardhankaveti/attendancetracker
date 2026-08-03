@@ -55,9 +55,29 @@ class _FacultyDashboardScreenState extends State<FacultyDashboardScreen> {
       int totalPresent = 0;
       int totalClasses = 0;
 
+      // Calculate today's attendance across all faculty courses
+      for (var courseDoc in coursesSnapshot.docs) {
+        final attendanceSnapshot = await FirebaseConfig.firestore
+            .collection('attendance')
+            .where('courseId', isEqualTo: courseDoc.id)
+            .get();
+
+        for (var attDoc in attendanceSnapshot.docs) {
+          final attStudents = attDoc.data()['students'] as List<dynamic>?;
+          if (attStudents != null) {
+            for (var s in attStudents) {
+              if (s is Map<String, dynamic>) {
+                totalClasses++;
+                if (s['isPresent'] == true) totalPresent++;
+              }
+            }
+          }
+        }
+      }
+
       setState(() {
         _totalStudents = students.length;
-        _todayAttendance = 92.0; // Mock data for now
+        _todayAttendance = totalClasses > 0 ? (totalPresent / totalClasses) * 100 : 0.0;
         _isLoading = false;
       });
     } catch (e) {
@@ -115,6 +135,8 @@ class _FacultyDashboardScreenState extends State<FacultyDashboardScreen> {
                         onSelected: (String result) {
                           if (result == 'logout') {
                             _logout(context, authProvider);
+                          } else if (result == 'profile') {
+                            context.push(AppRoutes.facultyProfile);
                           }
                         },
                         itemBuilder: (BuildContext context) =>
@@ -124,6 +146,17 @@ class _FacultyDashboardScreenState extends State<FacultyDashboardScreen> {
                             enabled: false,
                             child: _buildProfileInfoCard(faculty),
                             height: 200, // Custom height for profile info
+                          ),
+                          const PopupMenuDivider(),
+                          const PopupMenuItem<String>(
+                            value: 'profile',
+                            child: Row(
+                              children: [
+                                Icon(Icons.person, color: AppColors.secondary),
+                                SizedBox(width: 12),
+                                Text('View Full Profile'),
+                              ],
+                            ),
                           ),
                           const PopupMenuDivider(),
                           // Logout option
@@ -266,6 +299,32 @@ class _FacultyDashboardScreenState extends State<FacultyDashboardScreen> {
                             const Color(0xFF9C27B0),
                             () {
                               context.push(AppRoutes.facultyNotifications);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildActionButton(
+                            'Add Course',
+                            Icons.book_add,
+                            const Color(0xFF00BCD4),
+                            () {
+                              context.push(AppRoutes.facultyAddCourse);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildActionButton(
+                            'Timetable',
+                            Icons.calendar_month,
+                            const Color(0xFF795548),
+                            () {
+                              context.push(AppRoutes.facultyTimetable);
                             },
                           ),
                         ),

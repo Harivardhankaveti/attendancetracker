@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/constants/app_routes.dart';
+import '../../providers/auth_provider.dart';
 
 class StudentSettingsScreen extends StatefulWidget {
   const StudentSettingsScreen({super.key});
@@ -174,8 +178,12 @@ class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
                   leading: const Icon(Icons.exit_to_app),
                   title: const Text('Logout'),
                   subtitle: const Text('Sign out of your account'),
-                  onTap: () {
-                    // Handle logout
+                  onTap: () async {
+                    final authProvider = context.read<AuthProvider>();
+                    await authProvider.signOut();
+                    if (context.mounted) {
+                      context.go(AppRoutes.login);
+                    }
                   },
                 ),
               ],

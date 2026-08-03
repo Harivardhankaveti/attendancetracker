@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../constants/app_routes.dart';
+import '../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../screens/splash/splash_screen.dart';
 import '../../screens/auth/login_screen.dart';
@@ -13,6 +14,8 @@ import '../../screens/student/student_attendance_screen.dart';
 import '../../screens/student/student_settings_screen.dart';
 import '../../screens/student/student_notifications_screen.dart';
 import '../../screens/student/student_course_detail_screen.dart';
+import '../../screens/student/student_timetable_screen.dart';
+import '../../screens/student/student_profile_screen.dart';
 import '../../screens/faculty/faculty_dashboard_screen.dart';
 import '../../screens/faculty/faculty_mark_attendance_screen.dart';
 import '../../screens/faculty/faculty_view_attendance_screen.dart';
@@ -31,6 +34,8 @@ import '../../screens/admin/admin_feedback_screen.dart';
 import '../../screens/admin/admin_users_screen.dart';
 import '../../screens/admin/admin_students_screen.dart';
 import '../../screens/admin/admin_faculty_screen.dart';
+import '../../screens/admin/admin_notifications_view.dart';
+import '../../screens/admin/admin_settings_view.dart';
 
 class AppRouter {
   final AuthProvider authProvider;
@@ -131,13 +136,11 @@ class AppRouter {
       ),
       GoRoute(
         path: AppRoutes.studentTimetable,
-        builder: (context, state) =>
-            const PlaceholderScreen(title: 'Student Timetable'),
+        builder: (context, state) => const StudentTimetableScreen(),
       ),
       GoRoute(
         path: AppRoutes.studentProfile,
-        builder: (context, state) =>
-            const PlaceholderScreen(title: 'Student Profile'),
+        builder: (context, state) => const StudentProfileScreen(),
       ),
       GoRoute(
         path: AppRoutes.studentSettings,
@@ -230,12 +233,41 @@ class AppRouter {
       ),
       GoRoute(
         path: AppRoutes.adminAttendance,
-        builder: (context, state) =>
-            const PlaceholderScreen(title: 'Attendance Management'),
+        builder: (context, state) => const AdminStudentAttendanceScreen(),
       ),
       GoRoute(
         path: AppRoutes.adminReports,
-        builder: (context, state) => const PlaceholderScreen(title: 'Reports'),
+        builder: (context, state) => const AdminStudentAttendanceScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.adminNotifications,
+        builder: (context, state) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Notifications'),
+            backgroundColor: AppColors.adminColor,
+            foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => context.pop(),
+            ),
+          ),
+          body: const AdminNotificationsView(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.adminSettings,
+        builder: (context, state) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Settings'),
+            backgroundColor: AppColors.adminColor,
+            foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => context.pop(),
+            ),
+          ),
+          body: const AdminSettingsView(),
+        ),
       ),
     ],
 

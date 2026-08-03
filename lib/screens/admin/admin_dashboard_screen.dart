@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
 import '../../providers/auth_provider.dart';
+import '../../core/config/firebase_config.dart';
 import 'admin_notifications_view.dart';
 import 'admin_settings_view.dart';
 
@@ -16,6 +17,60 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _selectedIndex = 0;
+  int _totalStudents = 0;
+  int _totalFaculty = 0;
+  int _activeCourses = 0;
+  double _avgAttendance = 0.0;
+  bool _isLoadingStats = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final studentsSnap = await FirebaseConfig.firestore
+          .collection('users')
+          .where('role', isEqualTo: 'student')
+          .get();
+      final facultySnap = await FirebaseConfig.firestore
+          .collection('users')
+          .where('role', isEqualTo: 'faculty')
+          .get();
+      final coursesSnap = await FirebaseConfig.firestore
+          .collection('courses')
+          .get();
+
+      int totalPresent = 0;
+      int totalRecords = 0;
+      final attendanceSnap = await FirebaseConfig.firestore
+          .collection('attendance')
+          .get();
+      for (var doc in attendanceSnap.docs) {
+        final students = doc.data()['students'] as List<dynamic>?;
+        if (students != null) {
+          for (var s in students) {
+            if (s is Map<String, dynamic>) {
+              totalRecords++;
+              if (s['isPresent'] == true) totalPresent++;
+            }
+          }
+        }
+      }
+
+      setState(() {
+        _totalStudents = studentsSnap.docs.length;
+        _totalFaculty = facultySnap.docs.length;
+        _activeCourses = coursesSnap.docs.length;
+        _avgAttendance = totalRecords > 0 ? (totalPresent / totalRecords) * 100 : 0.0;
+        _isLoadingStats = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingStats = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +177,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       Expanded(
                         child: _buildStatCard(
                           'Total Students',
-                          '1,234',
+                          _isLoadingStats ? '...' : _totalStudents.toString(),
                           Icons.school,
                           AppColors.primary,
                         ),
@@ -131,7 +186,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       Expanded(
                         child: _buildStatCard(
                           'Total Faculty',
-                          '87',
+                          _isLoadingStats ? '...' : _totalFaculty.toString(),
                           Icons.people,
                           AppColors.secondary,
                         ),
@@ -144,7 +199,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       Expanded(
                         child: _buildStatCard(
                           'Avg Attendance',
-                          '82.5%',
+                          _isLoadingStats ? '...' : '${_avgAttendance.toStringAsFixed(1)}%',
                           Icons.check_circle,
                           AppColors.success,
                         ),
@@ -153,7 +208,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       Expanded(
                         child: _buildStatCard(
                           'Active Courses',
-                          '45',
+                          _isLoadingStats ? '...' : _activeCourses.toString(),
                           Icons.book,
                           AppColors.warning,
                         ),
@@ -242,9 +297,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         'Announcements',
                         Icons.campaign,
                         const Color(0xFF4ECDC4),
-                        () => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Coming Soon')),
-                        ),
+                        () => context.push(AppRoutes.adminNotifications),
                       ),
                     ],
                   ),
