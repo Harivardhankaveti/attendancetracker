@@ -61,10 +61,13 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         for (var attDoc in attendanceSnapshot.docs) {
           final students = attDoc.data()['students'] as List<dynamic>?;
           if (students != null) {
-            final studentRecord = students.firstWhere(
-              (s) => s['studentId'] == userId,
-              orElse: () => null,
-            );
+            Map<String, dynamic>? studentRecord;
+            for (var s in students) {
+              if (s is Map<String, dynamic> && s['studentId'] == userId) {
+                studentRecord = s;
+                break;
+              }
+            }
             if (studentRecord != null && studentRecord['isPresent'] == true) {
               present++;
             }

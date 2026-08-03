@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
+import '../../services/database_service.dart';
+import '../../models/user.dart' as app_model;
 
 class AdminFacultyScreen extends StatefulWidget {
   const AdminFacultyScreen({super.key});
@@ -9,43 +12,61 @@ class AdminFacultyScreen extends StatefulWidget {
 
 class _AdminFacultyScreenState extends State<AdminFacultyScreen> {
   final TextEditingController _searchController = TextEditingController();
-  bool _isLoading = false;
+  final DatabaseService _db = DatabaseService();
 
-  // Sample data - would come from backend in real implementation
-  final List<Map<String, dynamic>> _faculty = [
-    {
-      'id': 'FAC001',
-      'name': 'Dr. Sarah Johnson',
-      'email': 'sarah.johnson@university.edu',
-      'department': 'Computer Science',
-      'designation': 'Professor',
-      'courses': ['CS101', 'CS301', 'CS501'],
-      'status': 'active',
-    },
-    {
-      'id': 'FAC002',
-      'name': 'Dr. Michael Chen',
-      'email': 'michael.chen@university.edu',
-      'department': 'Mathematics',
-      'designation': 'Associate Professor',
-      'courses': ['MATH201', 'MATH401'],
-      'status': 'active',
-    },
-    {
-      'id': 'FAC003',
-      'name': 'Dr. Emily Rodriguez',
-      'email': 'emily.rodriguez@university.edu',
-      'department': 'Physics',
-      'designation': 'Assistant Professor',
-      'courses': ['PHYS101', 'PHYS301'],
-      'status': 'on leave',
-    },
+  bool _isLoading = true;
+  List<app_model.User> _faculty = [];
+  List<app_model.User> _filteredFaculty = [];
+  String? _selectedDepartment;
+
+  final List<String> _departments = [
+    'All',
+    'CSE',
+    'ECE',
+    'EEE',
+    'MECH',
+    'CIVIL',
+    'IT',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFaculty();
+    _searchController.addListener(_filterFaculty);
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadFaculty() async {
+    setState(() => _isLoading = true);
+    final faculty = await _db.getAllFaculty();
+    setState(() {
+      _faculty = faculty;
+      _filteredFaculty = faculty;
+      _isLoading = false;
+    });
+  }
+
+  void _filterFaculty() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredFaculty = _faculty.where((f) {
+        final matchesQuery = f.name.toLowerCase().contains(query) ||
+            f.email.toLowerCase().contains(query);
+
+        final matchesDept = _selectedDepartment == null ||
+            _selectedDepartment == 'All' ||
+            (f.department ?? '').toUpperCase() ==
+                _selectedDepartment.toUpperCase();
+
+        return matchesQuery && matchesDept;
+      }).toList();
+    });
   }
 
   @override
@@ -54,14 +75,6 @@ class _AdminFacultyScreenState extends State<AdminFacultyScreen> {
       appBar: AppBar(
         title: const Text('Manage Faculty'),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              // Navigate to add faculty screen
-            },
-          ),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -81,74 +94,136 @@ class _AdminFacultyScreenState extends State<AdminFacultyScreen> {
                 labelText: 'Filter by Department',
                 border: OutlineInputBorder(),
               ),
-              items: const [
-                DropdownMenuItem(value: '', child: Text('All Departments')),
-                DropdownMenuItem(value: 'CS', child: Text('Computer Science')),
-                DropdownMenuItem(value: 'MATH', child: Text('Mathematics')),
-                DropdownMenuItem(value: 'PHYS', child: Text('Physics')),
-                DropdownMenuItem(value: 'ENG', child: Text('Engineering')),
-              ],
-              onChanged: (value) {},
-              value: '',
+              value: _selectedDepartment ?? 'All',
+              items: _departments.map((dept) {
+                return DropdownMenuItem(value: dept, child: Text(dept));
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedDepartment = value;
+                });
+                _filterFaculty();
+              },
             ),
             const SizedBox(height: 16),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      itemCount: _faculty.length,
-                      itemBuilder: (context, index) {
-                        final faculty = _faculty[index];
-                        return Card(
-                          child: ExpansionTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.deepPurple.shade100,
-                              child: Text(faculty['name'].split(' ')[1][0],
-                                  style: const TextStyle(
-                                      color: Colors.deepPurple,
-                                      fontWeight: FontWeight.bold)),
-                            ),
-                            title: Text(faculty['name']),
-                            subtitle: Text(
-                                '${faculty['designation']} • ${faculty['department']}'),
+                  : _filteredFaculty.isEmpty
+                      ? const Center(child: Text('No faculty found'))
+                      : RefreshIndicator(
+                          onRefresh: _loadFaculty,
+                          child: ListView.builder(
+                            itemCount: _filteredFaculty.length,
+                            itemBuilder: (context, index) {
+              final faculty = _filteredFaculty[index];
+              return Card(
+                child: ExpansionTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.deepPurple.shade100,
+                    child: Text(
+                      faculty.name.isNotEmpty
+                          ? faculty.name[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                          color: Colors.deepPurple,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  title: Text(faculty.name),
+                  subtitle: Text(
+                      '${faculty.designation ?? 'Faculty'} • ${faculty.department ?? 'N/A'}'),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('ID: ${faculty.facultyId ?? 'N/A'}'),
+                          Text('Email: ${faculty.email}'),
+                          Text('Department: ${faculty.department ?? 'N/A'}'),
+                          Text(
+                              'Designation: ${faculty.designation ?? 'N/A'}'),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16.0, vertical: 8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('ID: ${faculty['id']}'),
-                                    Text('Email: ${faculty['email']}'),
-                                    Text(
-                                        'Courses: ${faculty['courses'].join(', ')}'),
-                                    Text('Status: ${faculty['status']}'),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        TextButton(
-                                          onPressed: () {},
-                                          child: const Text('Edit'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () {},
-                                          child: const Text('Assign Courses'),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                              TextButton(
+                                onPressed: () => _showEditDialog(faculty),
+                                child: const Text('Edit'),
                               ),
                             ],
                           ),
-                        );
-                      },
+                        ],
+                      ),
                     ),
+                  ],
+                ),
+              );
+            },
+                          ),
+                        ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _showEditDialog(app_model.User faculty) async {
+    final nameController = TextEditingController(text: faculty.name);
+    final deptController =
+        TextEditingController(text: faculty.department ?? '');
+    final designationController =
+        TextEditingController(text: faculty.designation ?? '');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Faculty'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Name')),
+              TextField(
+                  controller: deptController,
+                  decoration: const InputDecoration(labelText: 'Department')),
+              TextField(
+                  controller: designationController,
+                  decoration:
+                      const InputDecoration(labelText: 'Designation')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      await _db.updateUser(faculty.uid, {
+        'name': nameController.text.trim(),
+        'department': deptController.text.trim(),
+        'designation': designationController.text.trim(),
+      });
+      _loadFaculty();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Faculty updated')),
+        );
+      }
+    }
   }
 }

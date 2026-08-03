@@ -50,10 +50,13 @@ class _AdminStudentAttendanceScreenState extends State<AdminStudentAttendanceScr
         for (var attDoc in attendanceSnapshot.docs) {
           final students = attDoc.data()['students'] as List<dynamic>?;
           if (students != null) {
-            final studentRecord = students.firstWhere(
-              (s) => s['studentId'] == studentDoc.id,
-              orElse: () => null,
-            );
+            Map<String, dynamic>? studentRecord;
+            for (var s in students) {
+              if (s is Map<String, dynamic> && s['studentId'] == studentDoc.id) {
+                studentRecord = s;
+                break;
+              }
+            }
             if (studentRecord != null) {
               totalClasses++;
               if (studentRecord['isPresent'] == true) {

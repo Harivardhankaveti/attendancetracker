@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/constants/app_colors.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/database_service.dart';
+import '../../models/course.dart';
 
 class FacultyAddCourseScreen extends StatefulWidget {
   const FacultyAddCourseScreen({super.key});
@@ -12,43 +17,94 @@ class _FacultyAddCourseScreenState extends State<FacultyAddCourseScreen> {
   final TextEditingController _courseNameController = TextEditingController();
   final TextEditingController _courseDescriptionController =
       TextEditingController();
+  final TextEditingController _creditsController = TextEditingController();
+  final TextEditingController _semesterController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final DatabaseService _db = DatabaseService();
+
   bool _isLoading = false;
+  List<Course> _courses = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCourses();
+  }
 
   @override
   void dispose() {
     _courseCodeController.dispose();
     _courseNameController.dispose();
     _courseDescriptionController.dispose();
+    _creditsController.dispose();
+    _semesterController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCourses() async {
+    final authProvider = context.read<AuthProvider>();
+    final userId = authProvider.user?.uid;
+    if (userId == null) return;
+
+    final courses = await _db.getCoursesByFaculty(userId);
+    setState(() {
+      _courses = courses;
+    });
   }
 
   Future<void> _addCourse() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    final authProvider = context.read<AuthProvider>();
+    final userId = authProvider.user?.uid;
+    final userName = authProvider.user?.name ?? 'Faculty';
 
-    // Simulate course addition - replace with actual implementation
-    await Future.delayed(const Duration(seconds: 1));
+    if (userId == null) return;
 
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Course added successfully!'),
-        backgroundColor: Colors.green,
-      ),
+    setState(() => _isLoading = true);
+
+    final course = Course(
+      id: '',
+      code: _courseCodeController.text.trim(),
+      name: _courseNameController.text.trim(),
+      description: _courseDescriptionController.text.trim(),
+      department: authProvider.user?.department ?? '',
+      credits: int.tryParse(_creditsController.text.trim()) ?? 3,
+      facultyId: userId,
+      facultyName: userName,
+      students: [],
+      schedule: CourseSchedule(days: [], time: '', room: ''),
+      semester: _semesterController.text.trim(),
+      createdAt: DateTime.now(),
     );
 
-    // Clear form
-    _courseCodeController.clear();
-    _courseNameController.clear();
-    _courseDescriptionController.clear();
+    final courseId = await _db.createCourse(course);
 
-    setState(() {
-      _isLoading = false;
-    });
+    setState(() => _isLoading = false);
+
+    if (courseId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Course added successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      _courseCodeController.clear();
+      _courseNameController.clear();
+      _courseDescriptionController.clear();
+      _creditsController.clear();
+      _semesterController.clear();
+
+      _loadCourses();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to add course'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -106,6 +162,27 @@ class _FacultyAddCourseScreenState extends State<FacultyAddCourseScreen> {
                   prefixIcon: Icon(Icons.description_outlined),
                 ),
               ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _creditsController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Credits',
+                  hintText: 'e.g., 3',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.numbers),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _semesterController,
+                decoration: const InputDecoration(
+                  labelText: 'Semester',
+                  hintText: 'e.g., Fall 2025',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.calendar_month),
+                ),
+              ),
               const SizedBox(height: 24),
               if (_isLoading)
                 const Center(child: CircularProgressIndicator())
@@ -120,33 +197,34 @@ class _FacultyAddCourseScreenState extends State<FacultyAddCourseScreen> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
-              const SizedBox(height: 16),
-              // Course List Section
+              const SizedBox(height: 24),
               const Padding(
-                padding: EdgeInsets.only(top: 16.0),
+                padding: EdgeInsets.only(top: 8.0),
                 child: Text(
                   'My Courses',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
-              const ListTile(
-                leading: CircleAvatar(
-                  child: Icon(Icons.book_outlined),
-                ),
-                title: Text('CS101 - Introduction to Computer Science'),
-                subtitle: Text('Basic programming concepts'),
-                trailing: Icon(Icons.arrow_forward_ios),
-                onTap: null, // Would navigate to course details
-              ),
-              const ListTile(
-                leading: CircleAvatar(
-                  child: Icon(Icons.book_outlined),
-                ),
-                title: Text('CS201 - Data Structures'),
-                subtitle: Text('Advanced data organization'),
-                trailing: Icon(Icons.arrow_forward_ios),
-                onTap: null, // Would navigate to course details
-              ),
+              const SizedBox(height: 8),
+              if (_courses.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text(
+                    'No courses yet. Add your first course above.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                )
+              else
+                ..._courses.map((course) => ListTile(
+                      leading: const CircleAvatar(
+                        child: Icon(Icons.book_outlined),
+                      ),
+                      title: Text('${course.code} - ${course.name}'),
+                      subtitle: Text(course.description.isEmpty
+                          ? 'No description'
+                          : course.description),
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                    )),
             ],
           ),
         ),

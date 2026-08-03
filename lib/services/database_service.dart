@@ -19,6 +19,8 @@ class DatabaseService {
       _firestore.collection('attendance');
   CollectionReference get timetableCollection =>
       _firestore.collection('timetable');
+  CollectionReference get notificationsCollection =>
+      _firestore.collection('notifications');
 
   // MARK: User Operations
 
@@ -397,5 +399,206 @@ class DatabaseService {
               Attendance.fromMap(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
     });
+  }
+
+  // MARK: User Management
+
+  /// Get all users
+  Future<List<app_model.User>> getAllUsers() async {
+    try {
+      final snapshot = await usersCollection.orderBy('name').get();
+      return snapshot.docs
+          .map((doc) => app_model.User.fromMap(
+              doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+    } catch (e) {
+      print('Error getting all users: $e');
+      return [];
+    }
+  }
+
+  /// Get all students
+  Future<List<app_model.User>> getAllStudents() async {
+    try {
+      final snapshot = await usersCollection
+          .where('role', isEqualTo: 'student')
+          .orderBy('name')
+          .get();
+      return snapshot.docs
+          .map((doc) => app_model.User.fromMap(
+              doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+    } catch (e) {
+      print('Error getting all students: $e');
+      return [];
+    }
+  }
+
+  /// Get all faculty
+  Future<List<app_model.User>> getAllFaculty() async {
+    try {
+      final snapshot = await usersCollection
+          .where('role', isEqualTo: 'faculty')
+          .orderBy('name')
+          .get();
+      return snapshot.docs
+          .map((doc) => app_model.User.fromMap(
+              doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+    } catch (e) {
+      print('Error getting all faculty: $e');
+      return [];
+    }
+  }
+
+  /// Delete user document
+  Future<bool> deleteUser(String userId) async {
+    try {
+      await usersCollection.doc(userId).delete();
+      return true;
+    } catch (e) {
+      print('Error deleting user: $e');
+      return false;
+    }
+  }
+
+  /// Update user document
+  Future<bool> updateUser(
+      String userId, Map<String, dynamic> data) async {
+    try {
+      await usersCollection.doc(userId).update(data);
+      return true;
+    } catch (e) {
+      print('Error updating user: $e');
+      return false;
+    }
+  }
+
+  // MARK: Notifications
+
+  /// Create a notification
+  Future<String?> createNotification({
+    required String title,
+    required String message,
+    required String type,
+    String? targetRole,
+    String? targetUserId,
+  }) async {
+    try {
+      final docRef = await notificationsCollection.add({
+        'title': title,
+        'message': message,
+        'type': type,
+        'targetRole': targetRole,
+        'targetUserId': targetUserId,
+        'read': false,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+      return docRef.id;
+    } catch (e) {
+      print('Error creating notification: $e');
+      return null;
+    }
+  }
+
+  /// Get notifications for a user
+  Future<List<Map<String, dynamic>>> getNotificationsForUser(
+      String userId, String role) async {
+    try {
+      final snapshot = await notificationsCollection
+          .orderBy('timestamp', descending: true)
+          .limit(50)
+          .get();
+
+      List<Map<String, dynamic>> notifications = [];
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final targetRole = data['targetRole'];
+        final targetUserId = data['targetUserId'];
+
+        // Include if: targeted to all, targeted to this role, or targeted to this user
+        if (targetRole == null && targetUserId == null) {
+          notifications.add({'id': doc.id, ...data});
+        } else if (targetRole == role) {
+          notifications.add({'id': doc.id, ...data});
+        } else if (targetUserId == userId) {
+          notifications.add({'id': doc.id, ...data});
+        }
+      }
+      return notifications;
+    } catch (e) {
+      print('Error getting notifications: $e');
+      return [];
+    }
+  }
+
+  /// Mark notification as read
+  Future<void> markNotificationAsRead(String notificationId) async {
+    try {
+      await notificationsCollection.doc(notificationId).update({'read': true});
+    } catch (e) {
+      print('Error marking notification as read: $e');
+    }
+  }
+
+  /// Stream notifications for a user
+  Stream<List<Map<String, dynamic>>> notificationsStreamForUser(
+      String userId, String role) {
+    return notificationsCollection
+        .orderBy('timestamp', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) {
+      List<Map<String, dynamic>> notifications = [];
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final targetRole = data['targetRole'];
+        final targetUserId = data['targetUserId'];
+
+        if (targetRole == null && targetUserId == null) {
+          notifications.add({'id': doc.id, ...data});
+        } else if (targetRole == role) {
+          notifications.add({'id': doc.id, ...data});
+        } else if (targetUserId == userId) {
+          notifications.add({'id': doc.id, ...data});
+        }
+      }
+      return notifications;
+    });
+  }
+
+  // MARK: Course Detail
+
+  /// Get course by ID
+  Future<Course?> getCourseById(String courseId) async {
+    try {
+      final doc = await coursesCollection.doc(courseId).get();
+      if (doc.exists) {
+        return Course.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting course by ID: $e');
+      return null;
+    }
+  }
+
+  /// Get attendance records for a student across all courses
+  Future<List<Attendance>> getStudentAttendanceAllCourses(
+      String studentId) async {
+    try {
+      final courses = await getCoursesByStudent(studentId);
+      List<Attendance> allAttendance = [];
+
+      for (var course in courses) {
+        final records = await getAttendanceByCourse(course.id);
+        allAttendance.addAll(records);
+      }
+
+      return allAttendance;
+    } catch (e) {
+      print('Error getting student attendance: $e');
+      return [];
+    }
   }
 }

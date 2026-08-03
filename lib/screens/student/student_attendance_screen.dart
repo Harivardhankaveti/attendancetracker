@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user.dart' as app_model;
 import '../../core/constants/app_colors.dart';
+import '../../services/database_service.dart';
+import '../../models/course.dart';
+import '../../models/attendance.dart';
 
 class StudentAttendanceScreen extends StatefulWidget {
   const StudentAttendanceScreen({super.key});
@@ -17,10 +20,84 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
 
+  final DatabaseService _db = DatabaseService();
+  bool _isLoading = true;
+  List<Course> _courses = [];
+  List<Map<String, dynamic>> _subjectAttendance = [];
+  int _totalClasses = 0;
+  int _classesAttended = 0;
+  double _overallPercentage = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAttendanceData();
+  }
+
+  Future<void> _loadAttendanceData() async {
+    final authProvider = context.read<AuthProvider>();
+    final userId = authProvider.user?.uid;
+
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final courses = await _db.getCoursesByStudent(userId);
+
+      List<Map<String, dynamic>> subjectAttendance = [];
+      int totalAll = 0;
+      int attendedAll = 0;
+
+      for (var course in courses) {
+        final attendanceRecords = await _db.getAttendanceByCourse(course.id);
+
+        int total = attendanceRecords.length;
+        int attended = 0;
+
+        for (var record in attendanceRecords) {
+          if (record.isStudentPresent(userId)) {
+            attended++;
+          }
+        }
+
+        double percentage = total > 0 ? (attended / total) * 100 : 0.0;
+
+        subjectAttendance.add({
+          'code': course.code,
+          'name': course.name,
+          'total': total,
+          'attended': attended,
+          'percentage': percentage,
+        });
+
+        totalAll += total;
+        attendedAll += attended;
+      }
+
+      setState(() {
+        _courses = courses;
+        _subjectAttendance = subjectAttendance;
+        _totalClasses = totalAll;
+        _classesAttended = attendedAll;
+        _overallPercentage =
+            totalAll > 0 ? (attendedAll / totalAll) * 100 : 0.0;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final app_model.User? user = authProvider.user;
+
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return Scaffold(
       body: Column(
@@ -34,8 +111,8 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFFFF7A00), // Orange
-                  Color(0xFFFF007A), // Pink
+                  Color(0xFFFF7A00),
+                  Color(0xFFFF007A),
                 ],
               ),
               borderRadius: BorderRadius.only(
@@ -47,7 +124,6 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Back button and menu
                   Row(
                     children: [
                       IconButton(
@@ -62,7 +138,6 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  // Page title
                   const Text(
                     'Attendance Report',
                     style: TextStyle(
@@ -157,300 +232,298 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
           const SizedBox(height: 20),
 
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  // C. Student Info Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        _buildInfoRow(Icons.badge, 'Roll Number',
-                            user?.studentId ?? '23241a05v0'),
-                        _buildInfoRow(
-                            Icons.person, 'Name', user?.name ?? 'harivardhan'),
-                        _buildInfoRow(Icons.school, 'Course', 'B.Tech'),
-                        _buildInfoRow(
-                            Icons.apartment, 'Branch', 'Computer Science'),
-                        _buildInfoRow(
-                            Icons.calendar_month, 'Semester', '6th Semester'),
-                        _buildInfoRow(Icons.group, 'Section', 'E'),
-                        _buildInfoRow(
-                            Icons.calendar_today, 'Academic Year', '2025-2026'),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // D. Overall Attendance Analytics
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Overall Attendance',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+            child: RefreshIndicator(
+              onRefresh: _loadAttendanceData,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    // C. Student Info Card
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            SizedBox(
-                              height: 120,
-                              child: CircularProgressIndicator(
-                                value: 0.85, // 85% attendance
-                                strokeWidth: 12,
-                                backgroundColor: Colors.grey.shade200,
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                  Color(0xFFFF7A00),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          _buildInfoRow(Icons.badge, 'Roll Number',
+                              user?.studentId ?? 'N/A'),
+                          _buildInfoRow(
+                              Icons.person, 'Name', user?.name ?? 'Student'),
+                          _buildInfoRow(Icons.school, 'Course', 'B.Tech'),
+                          _buildInfoRow(Icons.apartment, 'Branch',
+                              user?.department ?? 'N/A'),
+                          _buildInfoRow(
+                              Icons.calendar_month, 'Year', user?.year ?? 'N/A'),
+                          _buildInfoRow(Icons.group, 'Section',
+                              user?.section ?? 'N/A'),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // D. Overall Attendance Analytics
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Overall Attendance',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              SizedBox(
+                                height: 120,
+                                child: CircularProgressIndicator(
+                                  value: _overallPercentage / 100,
+                                  strokeWidth: 12,
+                                  backgroundColor: Colors.grey.shade200,
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                    Color(0xFFFF7A00),
+                                  ),
                                 ),
                               ),
+                              Text(
+                                '${_overallPercentage.toStringAsFixed(0)}%',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildStatCard(
+                                  _totalClasses.toString(), 'Total'),
+                              _buildStatCard(
+                                  _classesAttended.toString(), 'Attended'),
+                              _buildStatCard(
+                                  (_totalClasses - _classesAttended)
+                                      .toString(),
+                                  'Missed'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // E. Subject-wise Attendance Card
+                    if (_subjectAttendance.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             const Text(
-                              '85%',
+                              'Subject-wise Attendance',
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.textPrimary,
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildStatCard('48', 'Total'),
-                            _buildStatCard('41', 'Attended'),
-                            _buildStatCard('7', 'Missed'),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // E. Subject-wise Attendance Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Subject-wise Attendance',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        DataTable(
-                          columnSpacing: 10,
-                          dataRowHeight: 50,
-                          headingRowColor:
-                              MaterialStateProperty.resolveWith<Color>(
-                            (Set<MaterialState> states) {
-                              return Colors.grey.shade100;
-                            },
-                          ),
-                          columns: const [
-                            DataColumn(
-                              label: Text(
-                                'Subject',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                            const SizedBox(height: 16),
+                            _subjectAttendance.isEmpty
+                                ? const Center(
+                                    child: Text('No attendance records yet'))
+                                : Column(
+                                    children: _subjectAttendance.map((subject) {
+                                      double pct = subject['percentage'];
+                                      Color color =
+                                          AppColors.getAttendanceColor(pct);
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 8.0),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 3,
+                                              child: Text(
+                                                '${subject['code']}',
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.bold),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text(
+                                                  '${subject['total']}',
+                                                  textAlign:
+                                                      TextAlign.center),
+                                            ),
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text(
+                                                  '${subject['attended']}',
+                                                  textAlign:
+                                                      TextAlign.center),
+                                            ),
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text(
+                                                '${pct.toStringAsFixed(1)}%',
+                                                style: TextStyle(
+                                                  color: color,
+                                                  fontWeight:
+                                                      FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                            const SizedBox(height: 8),
+                            const Divider(),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                      flex: 3,
+                                      child: Text('Subject',
+                                          style: TextStyle(
+                                              fontWeight:
+                                                  FontWeight.bold))),
+                                  Expanded(
+                                      flex: 1,
+                                      child: Text('Total',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              fontWeight:
+                                                  FontWeight.bold))),
+                                  Expanded(
+                                      flex: 1,
+                                      child: Text('Attended',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              fontWeight:
+                                                  FontWeight.bold))),
+                                  Expanded(
+                                      flex: 1,
+                                      child: Text('%',
+                                          style: TextStyle(
+                                              fontWeight:
+                                                  FontWeight.bold))),
+                                ],
                               ),
                             ),
-                            DataColumn(
-                              label: Text(
-                                'Total',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Attended',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                '%',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
                           ],
-                          rows: [
-                            _buildDataRow('Cloud Computing', 16, 14, 87.5),
-                            _buildDataRow('ACD', 16, 16, 100.0),
-                            _buildDataRow('Software Engineering', 16, 12, 75.0),
-                            _buildDataRow(
-                                'Constitution of India', 16, 13, 81.2),
-                            _buildDataRow(
-                                'Fundamentals of Management and Entrepreneurship',
-                                16,
-                                15,
-                                93.8),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // F. Detailed Attendance Button
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.calendar_month),
-                      label: const Text('Detailed Calendar View'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF7A00),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                    ),
-                  ),
 
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                  // G. Alerts Section
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Alerts',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                    // G. Alerts Section
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildAlertCard(
-                          Icons.warning,
-                          'Chemistry attendance is low (75%)',
-                          Colors.orange,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildAlertCard(
-                          Icons.trending_up,
-                          'Need 2 more classes to reach 75% in Chemistry',
-                          Colors.blue,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // H. Export / Actions Section
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Actions',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Alerts',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
-                            _buildActionChip('Download PDF', Icons.download),
-                            _buildActionChip('Share Report', Icons.share),
-                            _buildActionChip('Email', Icons.email),
-                            _buildActionChip('Print', Icons.print),
-                          ],
-                        ),
-                      ],
+                          const SizedBox(height: 12),
+                          ..._buildAlerts(),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 20),
-                ],
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  List<Widget> _buildAlerts() {
+    List<Widget> alerts = [];
+    for (var subject in _subjectAttendance) {
+      double pct = subject['percentage'];
+      if (pct < 75 && subject['total'] > 0) {
+        alerts.add(_buildAlertCard(
+          Icons.warning,
+          '${subject['code']} attendance is low (${pct.toStringAsFixed(1)}%)',
+          Colors.orange,
+        ));
+        alerts.add(const SizedBox(height: 8));
+      }
+    }
+    if (alerts.isEmpty) {
+      alerts.add(_buildAlertCard(
+        Icons.check_circle,
+        'Your attendance is good. Keep it up!',
+        Colors.green,
+      ));
+    }
+    return alerts;
   }
 
   Widget _buildFilterOption(String label, String value) {
@@ -491,10 +564,7 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
             flex: 1,
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
           ),
           Expanded(
@@ -527,32 +597,7 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-          ),
-        ),
-      ],
-    );
-  }
-
-  DataRow _buildDataRow(
-      String subject, int total, int attended, double percentage) {
-    Color percentageColor = percentage >= 75 ? Colors.green : Colors.orange;
-
-    return DataRow(
-      cells: [
-        DataCell(Text(subject)),
-        DataCell(Text(total.toString())),
-        DataCell(Text(attended.toString())),
-        DataCell(
-          Text(
-            '${percentage.toStringAsFixed(1)}%',
-            style: TextStyle(
-              color: percentageColor,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
         ),
       ],
     );
@@ -573,33 +618,11 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: color, fontSize: 14),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildActionChip(String label, IconData icon) {
-    return FilterChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16),
-          const SizedBox(width: 4),
-          Text(label),
-        ],
-      ),
-      selected: false,
-      onSelected: (bool selected) {},
-      backgroundColor: Colors.grey.shade100,
-      selectedColor: const Color(0xFFFF7A00),
-      checkmarkColor: Colors.white,
-      labelStyle: const TextStyle(color: Colors.grey),
     );
   }
 
